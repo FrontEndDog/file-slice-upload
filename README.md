@@ -18,8 +18,9 @@
 ```bash
 # 初始化项目 选择 Vue + TypeScript
 pnpm create vite
-# 相关依赖
-pnpm i express multer -S
+# 安装相关依赖
+pnpm i express multer axios spark-md5 -S
+pnpm i @types/spark-md5 -D
 # 代码规范(可跳过)
 pnpm i eslint-config-fed -D
 # 启动项目
