@@ -27,3 +27,20 @@ pnpm run dev
 ```
 
 代码规范可按照[README.md](https://github.com/FrontEndDog/eslint-prettier)中的步骤配置代码规范。
+
+### 处理开发环境跨域
+
+```ts
+// vite.config.ts 添加server.proxy配置
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
+})
+```

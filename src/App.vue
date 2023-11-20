@@ -1,7 +1,3 @@
-<script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
-</script>
-
 <template>
   <div>
     <a href="https://vitejs.dev" target="_blank">
@@ -11,9 +7,19 @@ import HelloWorld from './components/HelloWorld.vue'
       <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
     </a>
   </div>
+  <input ref="input" type="file" @change="fileChoose" />
   <HelloWorld msg="Vite + Vue" />
 </template>
-
+<script setup lang="ts">
+import HelloWorld from './components/HelloWorld.vue'
+const fileChoose = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  if (input.files && input.files.length > 0) {
+    const file = input.files[0]
+    console.log(file)
+  }
+}
+</script>
 <style scoped>
 .logo {
   height: 6em;
