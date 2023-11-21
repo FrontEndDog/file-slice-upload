@@ -11,10 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+service/files
+service/chunks
+service/.temp
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
