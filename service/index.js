@@ -3,6 +3,7 @@ import multer from 'multer'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { v4 as uuidv4 } from 'uuid'
 //当前的绝对路径
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 //文件的存储目录
@@ -21,54 +22,51 @@ if (!fs.existsSync(chunksDir)) {
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir)
 }
-
+const getFileExt = (fileName) => {
+  const tempArr = fileName.split('.')
+  return tempArr[tempArr.length - 1]
+}
 const app = express()
-
-// ----------普通上传start----------
-
-//配置multer的存储设置
-const storage = multer.diskStorage({
-  //存储的文件位置
-  destination: function (req, file, cb) {
-    cb(null, tempDir)
-  },
-  //存储的文件名称
-  filename: function (req, file, cb) {
-    cb(null, req.body.md5 + '.' + req.body.ext)
-  },
+// 1.最简单的上传
+const simpleUploadMulter = multer({
+  storage: multer.diskStorage({
+    //文件位置
+    destination: function (req, file, cb) {
+      cb(null, tempDir)
+    },
+    //文件名称
+    filename: function (req, file, cb) {
+      const fileName = (req.body.md5 || uuidv4()) + '.' + getFileExt(file.originalname)
+      req.body.tempPath = path.join(tempDir, fileName)
+      req.body.filePath = path.join(filesDir, fileName)
+      cb(null, fileName)
+    },
+  }),
 })
-const upload = multer({ storage: storage })
-
-// 文件上传
-app.post('/upload', upload.single('file'), (req, res) => {
-  // 文件上传成功后从临时文件夹移动到正式文件夹
-  const newPath = path.join(filesDir, req.body.md5 + '.' + req.body.ext)
-  fs.renameSync(req.file.path, newPath)
-  res.send(newPath)
+app.post('/simpleUpload', simpleUploadMulter.single('file'), (req, res) => {
+  const { tempPath, filePath } = req.body
+  fs.renameSync(tempPath, filePath)
+  res.send(filePath)
 })
 
-// ----------普通上传end----------
+// 2.分片上传
 
-// ----------分片上传start----------
-
-// 配置multer的存储设置
-const chunkStorage = multer.diskStorage({
-  //存储的文件位置
-  destination: function (req, file, cb) {
-    const chunkPath = path.join(tempDir, req.body.md5)
-    if (!fs.existsSync(chunkPath)) {
-      fs.mkdirSync(chunkPath)
-    }
-    cb(null, chunkPath)
-  },
-  //存储的文件名称
-  filename: function (req, file, cb) {
-    cb(null, req.body.index)
-  },
+const chunkUpload = multer({
+  storage: multer.diskStorage({
+    //存储的文件位置
+    destination: function (req, file, cb) {
+      const chunkPath = path.join(tempDir, req.body.md5)
+      if (!fs.existsSync(chunkPath)) {
+        fs.mkdirSync(chunkPath)
+      }
+      cb(null, chunkPath)
+    },
+    //存储的文件名称
+    filename: function (req, file, cb) {
+      cb(null, req.body.index)
+    },
+  }),
 })
-const chunkUpload = multer({ storage: chunkStorage })
-
-// 文件分片上传
 app.post('/chunkUpload', chunkUpload.single('file'), (req, res) => {
   const newPath = path.join(chunksDir, req.body.md5)
   if (!fs.existsSync(newPath)) {
@@ -90,7 +88,6 @@ app.post('/chunkUpload', chunkUpload.single('file'), (req, res) => {
     res.send('')
   }
 })
-// ----------分片上传end----------
 
 // 读取文件
 app.get('/' + filesDir + '/*', function (req, res) {

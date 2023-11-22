@@ -1,6 +1,6 @@
 <template>
   <div>
-    <input type="file" @change="fileChoose" />
+    <input type="file" @change="handleInputChange" />
     <!-- 文件列表 -->
     <div v-for="item in fileList" :key="item.md5">
       <a :href="item.url" target="_blank">{{ item.file.name }}</a>
@@ -21,7 +21,7 @@ interface RawFile {
 }
 const fileList = reactive<RawFile[]>([])
 
-const fileChoose = async (e: Event) => {
+const handleInputChange = async (e: Event) => {
   const input = e.target as HTMLInputElement
   if (input.files && input.files.length > 0) {
     const file = input.files[0]
@@ -33,33 +33,30 @@ const fileChoose = async (e: Event) => {
       url: '',
     })
     fileList.push(rawFile)
-    console.log(upload, chunkUpload)
-    // upload(rawFile)
+    console.log(simpleUpload, chunkUpload)
+    // simpleUpload(rawFile)
     chunkUpload(rawFile)
     input.value = ''
   }
 }
 
 //普通上传
-const upload = async (rawFile: RawFile) => {
+const simpleUpload = async (rawFile: RawFile) => {
   const formData = new FormData()
   formData.append('md5', rawFile.md5)
-  formData.append('ext', getFileExt(rawFile.file.name))
   formData.append('file', rawFile.file)
-  const res = await axios.post('/api/upload', formData, {
+  const res = await axios.post('/api/simpleUpload', formData, {
     onUploadProgress: (e) => {
       if (e.progress) {
         rawFile.progress = e.progress * 100
       }
     },
   })
-  rawFile.progress = 100
   rawFile.url = 'http://localhost:3000/' + res.data
 }
 
 //分片上传
-const chunkUpload = async (rawFile: RawFile) => {
-  const chunkSize = 100 * 1024
+const chunkUpload = async (rawFile: RawFile, chunkSize: number = 100 * 1024) => {
   const chunkList: Blob[] = []
   for (let i = 0; i < rawFile.file.size; i += chunkSize) {
     const chunk = rawFile.file.slice(i, Math.min(i + chunkSize, rawFile.file.size))
@@ -78,13 +75,12 @@ const chunkUpload = async (rawFile: RawFile) => {
       formData.append('file', item)
       const res = await axios.post('/api/chunkUpload', formData, {
         onUploadProgress: (e) => {
-          chunkProgressList[index] = e.loaded
-          const total = chunkProgressList.reduce((item) => (item += e.loaded), 0)
-          rawFile.progress = (total / rawFile.file.size) * 100
+          chunkProgressList[index] = Math.min(chunkSize, e.loaded)
+          const total = chunkProgressList.reduce((total, item) => total + item, 0)
+          rawFile.progress = Math.min(100, (total / rawFile.file.size) * 100)
         },
       })
       if (res.data) {
-        rawFile.progress = 100
         rawFile.url = 'http://localhost:3000/' + res.data
       }
     }),
