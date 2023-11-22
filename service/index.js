@@ -23,8 +23,7 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir)
 }
 const getFileExt = (fileName) => {
-  const tempArr = fileName.split('.')
-  return tempArr[tempArr.length - 1]
+  return fileName.split('.').pop() || ''
 }
 const app = express()
 app.use(express.json())

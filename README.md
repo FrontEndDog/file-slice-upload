@@ -151,6 +151,33 @@ export default defineConfig({
 </script>
 ```
 
+### 文件特别大怎么办 计算MD5的时候浏览器卡死怎么办
+
+有三种处理方法
+
+1.window.requestIdleCallback 传入一个函数,这个函数将在浏览器空闲时期被调用
+
+2.new Worker 开一个新的后台线程，来计算MD5
+
+3.抽样计算MD5
+
+```html
+<script setup lang="ts">
+  //取第一块切片的全部
+  const sampleFile = [file.slice(0, CHUNK_SIZE)]
+  for (let i = CHUNK_SIZE; i < file.size; i += CHUNK_SIZE) {
+    if (i + CHUNK_SIZE >= file.size) {
+      //取最后一个切片的全部
+      sampleFile.push(file.slice(i, file.size))
+    } else {
+      //中间切片取2个字节
+      sampleFile.push(file.slice(i, i + 2))
+    }
+  }
+  fileReader.readAsArrayBuffer(new Blob(sampleFile))
+</script>
+```
+
 ### 在formData中添加额外的信息
 
 ```html
@@ -175,6 +202,45 @@ export default defineConfig({
     } else {
       return false
     }
+  }
+</script>
+```
+
+### 分片上传
+
+```html
+<script setup lang="ts">
+  //分片上传
+  const chunkUpload = async (rawFile: RawFile) => {
+    if (await isExistFile(rawFile)) return
+    const chunkList: Blob[] = []
+    for (let i = 0; i < rawFile.file.size; i += CHUNK_SIZE) {
+      const chunk = rawFile.file.slice(i, Math.min(i + CHUNK_SIZE, rawFile.file.size))
+      chunkList.push(chunk)
+    }
+    const chunkProgressList = chunkList.map(() => 0)
+    await Promise.all(
+      chunkList.map(async (item, index) => {
+        const chunkMd5 = await getFileMd5(item)
+        const formData = new FormData()
+        formData.append('chunkMd5', chunkMd5)
+        formData.append('md5', rawFile.md5)
+        formData.append('ext', getFileExt(rawFile.file.name))
+        formData.append('index', index.toString())
+        formData.append('total', chunkList.length.toString())
+        formData.append('file', item)
+        const res = await axios.post('/api/chunkUpload', formData, {
+          onUploadProgress: (e) => {
+            chunkProgressList[index] = Math.min(CHUNK_SIZE, e.loaded)
+            const total = chunkProgressList.reduce((total, item) => total + item, 0)
+            rawFile.progress = Math.min(100, (total / rawFile.file.size) * 100)
+          },
+        })
+        if (res.data) {
+          rawFile.url = res.data
+        }
+      }),
+    )
   }
 </script>
 ```
