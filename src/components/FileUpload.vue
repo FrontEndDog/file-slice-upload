@@ -1,11 +1,9 @@
 <template>
-  <div>
-    <input type="file" @change="handleInputChange" />
-    <!-- 文件列表 -->
-    <div v-for="item in fileList" :key="item.md5">
-      <a :href="item.url" target="_blank">{{ item.file.name }}</a>
-      {{ item.progress.toFixed(2) + '%' }}
-    </div>
+  <input type="file" @change="handleInputChange" />
+
+  <div v-for="item in fileList" :key="item.md5">
+    <a :href="SERVICE_PATH + item.url" target="_blank">{{ item.file.name }}</a>
+    {{ item.progress.toFixed(2) + '%' }}
   </div>
 </template>
 
@@ -13,6 +11,7 @@
 import sparkMd5 from 'spark-md5'
 import axios from 'axios'
 import { reactive } from 'vue'
+const SERVICE_PATH = 'http://localhost:3000/'
 interface RawFile {
   file: File
   progress: number
@@ -34,14 +33,15 @@ const handleInputChange = async (e: Event) => {
     })
     fileList.push(rawFile)
     console.log(simpleUpload, chunkUpload)
-    // simpleUpload(rawFile)
-    chunkUpload(rawFile)
+    simpleUpload(rawFile)
+    // chunkUpload(rawFile)
     input.value = ''
   }
 }
 
 //普通上传
 const simpleUpload = async (rawFile: RawFile) => {
+  if (await isExistFile(rawFile)) return
   const formData = new FormData()
   formData.append('md5', rawFile.md5)
   formData.append('file', rawFile.file)
@@ -52,7 +52,7 @@ const simpleUpload = async (rawFile: RawFile) => {
       }
     },
   })
-  rawFile.url = 'http://localhost:3000/' + res.data
+  rawFile.url = res.data
 }
 
 //分片上传
@@ -85,6 +85,18 @@ const chunkUpload = async (rawFile: RawFile, chunkSize: number = 100 * 1024) => 
       }
     }),
   )
+}
+
+//判断文件是否存在
+const isExistFile = async (rawFile: RawFile) => {
+  const res = await axios.post('/api/checkFile', { md5: rawFile.md5, ext: getFileExt(rawFile.file.name) })
+  if (res.data) {
+    rawFile.progress = 100
+    rawFile.url = res.data
+    return true
+  } else {
+    return false
+  }
 }
 
 //获取文件的MD5

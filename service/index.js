@@ -27,6 +27,7 @@ const getFileExt = (fileName) => {
   return tempArr[tempArr.length - 1]
 }
 const app = express()
+app.use(express.json())
 // 1.最简单的上传
 const simpleUploadMulter = multer({
   storage: multer.diskStorage({
@@ -50,7 +51,6 @@ app.post('/simpleUpload', simpleUploadMulter.single('file'), (req, res) => {
 })
 
 // 2.分片上传
-
 const chunkUpload = multer({
   storage: multer.diskStorage({
     //存储的文件位置
@@ -93,6 +93,17 @@ app.post('/chunkUpload', chunkUpload.single('file'), (req, res) => {
 app.get('/' + filesDir + '/*', function (req, res) {
   const fileName = req.params[0]
   res.sendFile(path.resolve(__dirname, filesDir, fileName))
+})
+
+// 检查文件是否上传过
+app.post('/checkFile', (req, res) => {
+  const { md5, ext } = req.body
+  const filePath = path.join(filesDir, md5 + '.' + ext)
+  if (fs.existsSync(filePath)) {
+    res.send(filePath)
+  } else {
+    res.send('')
+  }
 })
 
 app.listen(3000, () => {
