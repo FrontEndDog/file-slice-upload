@@ -2,11 +2,11 @@
 
 ## 实现的功能
 
+- [ ] 上传进度展示
+- [ ] 秒传
 - [ ] 文件切片上传
 - [ ] 控制切片的并发数
-- [ ] 服务端合并文件
 - [ ] 断点续传
-- [ ] 秒传
 
 ## 服务端
 
@@ -26,7 +26,7 @@ pnpm i @types/spark-md5 @types/uuid node-dev -D
 pnpm i eslint-config-fed -D
 ```
 
-代码规范可按照[README.md](https://github.com/FrontEndDog/eslint-prettier)中的步骤配置代码规范。
+如有添加代码规范可按照[README.md](https://github.com/FrontEndDog/eslint-prettier)中的步骤配置。
 
 ### 处理开发环境跨域
 
@@ -75,7 +75,7 @@ export default defineConfig({
 <template>
   <input type="file" @change="handleInputChange" />
 
-  <div v-for="item in fileList" :key="item.md5">
+  <div v-for="item in fileList" :key="item.uuid">
     <a :href="SERVICE_PATH + item.url" target="_blank">{{ item.file.name }}</a>
     {{ item.progress.toFixed(2) + '%' }}
   </div>
@@ -151,7 +151,17 @@ export default defineConfig({
 </script>
 ```
 
-### 文件特别大怎么办 计算MD5的时候浏览器卡死怎么办
+### 在formData中添加额外的信息
+
+```html
+<script setup lang="ts">
+  const md5 = await getFileMd5(file)
+
+  formData.append('md5', rawFile.md5)
+</script>
+```
+
+### 文件特别大 计算MD5的时候浏览器卡死怎么办
 
 有三种处理方法
 
@@ -159,7 +169,9 @@ export default defineConfig({
 
 2.new Worker 开一个新的后台线程，来计算MD5
 
-3.抽样计算MD5
+3.抽样计算MD5（牺牲了一部分准确性）
+
+前两种方法计算依赖于文件切片，后面再介绍，这里先说一下第三种方法
 
 ```html
 <script setup lang="ts">
@@ -175,16 +187,6 @@ export default defineConfig({
     }
   }
   fileReader.readAsArrayBuffer(new Blob(sampleFile))
-</script>
-```
-
-### 在formData中添加额外的信息
-
-```html
-<script setup lang="ts">
-  const md5 = await getFileMd5(file)
-
-  formData.append('md5', rawFile.md5)
 </script>
 ```
 
