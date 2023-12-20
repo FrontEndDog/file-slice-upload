@@ -7,12 +7,15 @@
       <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
     </a>
   </div>
-  <FileUpload></FileUpload>
-  <HelloWorld msg="Vite + Vue" />
+
+  <div class="flex">
+    <FileUpload></FileUpload>
+    <FileUpload2></FileUpload2>
+  </div>
 </template>
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
 import FileUpload from './components/FileUpload.vue'
+import FileUpload2 from './components/FileUpload2.vue'
 </script>
 <style scoped>
 .logo {
@@ -21,10 +24,28 @@ import FileUpload from './components/FileUpload.vue'
   will-change: filter;
   transition: filter 300ms;
 }
+.flex {
+  display: flex;
+  text-align: left;
+}
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
 .logo.vue:hover {
   filter: drop-shadow(0 0 2em #42b883aa);
+}
+@keyframes move {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-200px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+.logo {
+  /* animation: move 3s linear infinite; */
 }
 </style>

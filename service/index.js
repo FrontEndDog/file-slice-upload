@@ -72,17 +72,18 @@ app.post('/chunkUpload', chunkUpload.single('file'), (req, res) => {
     fs.mkdirSync(newPath)
   }
   fs.renameSync(req.file.path, path.join(newPath, req.body.index))
-  const chunkSize = fs.readdirSync(newPath).length
-  if (chunkSize.toString() === req.body.total) {
+  const chunkNumber = fs.readdirSync(newPath).length
+  if (chunkNumber.toString() === req.body.total) {
     const filePath = path.join(filesDir, req.body.md5 + '.' + req.body.ext)
     if (!fs.existsSync(filePath)) {
-      for (let i = 0; i < chunkSize; i++) {
+      for (let i = 0; i < chunkNumber; i++) {
         const data = fs.readFileSync(path.join(chunksDir, req.body.md5, i.toString()))
         fs.appendFileSync(filePath, data)
-        fs.unlinkSync(path.join(chunksDir, req.body.md5, i.toString()))
       }
     }
+    //删除分片目录
     res.send(filePath)
+    fs.rmSync(newPath, { recursive: true, force: true })
   } else {
     res.send('')
   }
@@ -98,10 +99,19 @@ app.get('/' + filesDir + '/*', function (req, res) {
 app.post('/checkFile', (req, res) => {
   const { md5, ext } = req.body
   const filePath = path.join(filesDir, md5 + '.' + ext)
+
   if (fs.existsSync(filePath)) {
-    res.send(filePath)
+    console.log('文件已经上传过了')
+    res.send({ url: filePath })
   } else {
-    res.send('')
+    const chunkPath = path.join(chunksDir, md5)
+    if (fs.existsSync(chunkPath)) {
+      console.log('文件没有上传成功过')
+      const uploadedList = fs.readdirSync(chunkPath)
+      res.send({ uploadedList: uploadedList.map((item) => Number(item)) })
+    } else {
+      res.send({ uploadedList: [] })
+    }
   }
 })
 

@@ -3,8 +3,8 @@
   //配置保存自动格式化
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.fixAll.stylelint": true
+    "source.fixAll.eslint": "explicit",
+    "source.fixAll.stylelint": "explicit"
   },
   //指定默认格式化工具
   "editor.defaultFormatter": "esbenp.prettier-vscode",

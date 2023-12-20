@@ -65,6 +65,7 @@ export default defineConfig({
     const formData = new FormData()
     formData.append('file', file)
     const res = await axios.post('/api/simpleUpload', formData)
+    console.log(res)
   }
 </script>
 ```
@@ -73,11 +74,13 @@ export default defineConfig({
 
 ```html
 <template>
-  <input type="file" @change="handleInputChange" />
+  <div>
+    <input type="file" @change="handleInputChange" />
 
-  <div v-for="item in fileList" :key="item.uuid">
-    <a :href="SERVICE_PATH + item.url" target="_blank">{{ item.file.name }}</a>
-    {{ item.progress.toFixed(2) + '%' }}
+    <div v-for="item in fileList" :key="item.uuid">
+      <a :href="SERVICE_PATH + item.url" target="_blank">{{ item.file.name }}</a>
+      {{ item.progress.toFixed(2) + '%' }}
+    </div>
   </div>
 </template>
 
@@ -136,7 +139,7 @@ export default defineConfig({
 ```html
 <script setup lang="ts">
   import sparkMd5 from 'spark-md5'
-  //获取文件的MD5
+  //获取文件的MD5 不做优化的
   const getFileMd5 = async (file: Blob): Promise<string> => {
     return new Promise((resolve) => {
       const spark = new sparkMd5.ArrayBuffer()
@@ -145,7 +148,10 @@ export default defineConfig({
         spark.append(e.target?.result as ArrayBuffer)
         resolve(spark.end())
       }
-      fileReader.readAsArrayBuffer(file)
+      fileReader.onerror = () => {
+        console.log('读取文件出现错误了')
+      }
+      fileReader.readAsBinaryString(file)
     })
   }
 </script>
@@ -212,28 +218,41 @@ export default defineConfig({
 
 ```html
 <script setup lang="ts">
+  //创建文件切片列表
+  const createChunkList = (rawFile: RawFile): ChunkType[] => {
+    let chunkList: ChunkType[] = []
+    const { file, md5 } = rawFile
+    const total = Math.ceil(file.size / CHUNK_SIZE)
+    for (let i = 0; i < total; i++) {
+      const chunk = file.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, file.size))
+      const formData = new FormData()
+      formData.append('md5', md5)
+      formData.append('ext', getFileExt(file.name))
+      formData.append('index', i.toString())
+      formData.append('total', total.toString())
+      formData.append('file', chunk)
+      chunkList.push({ index: i, formData: formData, blob: chunk })
+    }
+    return chunkList
+  }
+
   //分片上传
   const chunkUpload = async (rawFile: RawFile) => {
-    if (await isExistFile(rawFile)) return
-    const chunkList: Blob[] = []
-    for (let i = 0; i < rawFile.file.size; i += CHUNK_SIZE) {
-      const chunk = rawFile.file.slice(i, Math.min(i + CHUNK_SIZE, rawFile.file.size))
-      chunkList.push(chunk)
+    const existFileRes = await isExistFile(rawFile)
+    if (existFileRes.url) {
+      rawFile.progress = 100
+      rawFile.url = existFileRes.url
+      console.log('秒传成功')
+      return
     }
-    const chunkProgressList = chunkList.map(() => 0)
+    let chunkList: ChunkType[] = createChunkList(rawFile)
+    //上传进度列表
+    const chunkProgressList: number[] = chunkList.map((_, index) => 0)
     await Promise.all(
-      chunkList.map(async (item, index) => {
-        const chunkMd5 = await getFileMd5(item)
-        const formData = new FormData()
-        formData.append('chunkMd5', chunkMd5)
-        formData.append('md5', rawFile.md5)
-        formData.append('ext', getFileExt(rawFile.file.name))
-        formData.append('index', index.toString())
-        formData.append('total', chunkList.length.toString())
-        formData.append('file', item)
-        const res = await axios.post('/api/chunkUpload', formData, {
+      chunkList.map(async (item) => {
+        const res = await axios.post('/api/chunkUpload', item.formData, {
           onUploadProgress: (e) => {
-            chunkProgressList[index] = Math.min(CHUNK_SIZE, e.loaded)
+            chunkProgressList[item.index] = Math.min(CHUNK_SIZE, e.loaded)
             const total = chunkProgressList.reduce((total, item) => total + item, 0)
             rawFile.progress = Math.min(100, (total / rawFile.file.size) * 100)
           },
@@ -244,5 +263,59 @@ export default defineConfig({
       }),
     )
   }
+</script>
+```
+
+这种做法会有一个问题，假设一个文件100M,单个切片大小1M,浏览器会一下发送100个请求出去
+
+### 上传队列并发数控制
+
+```html
+<script setup lang="ts">
+  const asyncQueue = (taskList: (() => Promise<string | void>)[], concurrency = 3) => {
+    //当前有多少个任务在执行
+    let running = 0
+    //当前执行到第几个任务
+    let currentTaskIndex = 0
+    //最终的接口返回结果
+    let res: string
+    return new Promise<string>((resolve) => {
+      const runTask = async (task: () => Promise<string | void>) => {
+        running++
+        const result = await task()
+        if (result) {
+          res = result
+        }
+        running--
+        starTask()
+      }
+
+      const starTask = () => {
+        while (running < concurrency && currentTaskIndex < taskList.length) {
+          const task = taskList[currentTaskIndex++]
+          runTask(task)
+        }
+        if (running === 0 && currentTaskIndex === taskList.length) {
+          resolve(res)
+        }
+      }
+
+      starTask()
+    })
+  }
+</script>
+```
+
+### 断点续传
+
+```html
+<script setup lang="ts">
+  //过滤掉已经上传过的
+  const unloadList: ChunkType[] = chunkList.filter((item) => !existFileRes.uploadedList?.includes(item.index))
+
+  //上传进度列表
+  const chunkProgressList: number[] = chunkList.map((_, index) =>
+    existFileRes.uploadedList?.includes(index) ? CHUNK_SIZE : 0,
+  )
 </script>
 ```
