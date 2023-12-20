@@ -348,7 +348,7 @@ export default defineConfig({
 
       const work = async (deadline: { timeRemaining: () => number }) => {
         while (index < chunkList.length && deadline.timeRemaining() > 1) {
-          console.log(`正在计算第${index}个,浏览器空闲剩余:${deadline.timeRemaining()}帧`)
+          console.log(`正在计算第${index}个,浏览器空闲剩余:${deadline.timeRemaining()}ms`)
           await appendToSpark(chunkList[index])
           index++
           if (index == chunkList.length) {

@@ -22,6 +22,13 @@ interface RawFile {
   progress: number
   url: string
 }
+
+interface ChunkType {
+  index: number
+  formData: FormData
+  blob: Blob
+}
+
 const fileList = reactive<RawFile[]>([])
 
 //input内容发生改变
@@ -40,12 +47,6 @@ const handleInputChange = async (e: Event) => {
     chunkUpload(rawFile)
     input.value = ''
   }
-}
-
-interface ChunkType {
-  index: number
-  formData: FormData
-  blob: Blob
 }
 
 //创建文件切片列表
@@ -225,7 +226,7 @@ const getFileMd5Idle = async (file: Blob): Promise<string> => {
 
     const work = async (deadline: { timeRemaining: () => number }) => {
       while (index < chunkList.length && deadline.timeRemaining() > 1) {
-        console.log(`正在计算第${index}个,浏览器空闲剩余:${deadline.timeRemaining()}帧`)
+        console.log(`正在计算第${index}个,浏览器空闲剩余:${deadline.timeRemaining()}ms`)
         await appendToSpark(chunkList[index])
         index++
         if (index == chunkList.length) {
@@ -241,16 +242,16 @@ const getFileMd5Idle = async (file: Blob): Promise<string> => {
   })
 }
 
+//获取文件后缀名
+const getFileExt = (fileName: string): string => {
+  return fileName.split('.').pop() || ''
+}
+
 defineExpose({
   getFileMd5,
   getFileMd5Idle,
   getFileMd5Sample,
 })
-
-//获取文件后缀名
-const getFileExt = (fileName: string): string => {
-  return fileName.split('.').pop() || ''
-}
 </script>
 
 <style scoped></style>
