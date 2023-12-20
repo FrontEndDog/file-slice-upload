@@ -319,3 +319,49 @@ export default defineConfig({
   )
 </script>
 ```
+
+### 利用浏览器空闲帧计算MD5
+
+```html
+<script setup lang="ts">
+  //获取文件的MD5 利用浏览器的空闲帧来计算
+  const getFileMd5Idle = async (file: Blob): Promise<string> => {
+    return new Promise((resolve) => {
+      const chunkList: Blob[] = []
+      for (let i = 0; i < file.size; i += CHUNK_SIZE) {
+        const chunk = file.slice(i, Math.min(i + CHUNK_SIZE, file.size))
+        chunkList.push(chunk)
+      }
+
+      let index = 0
+      const spark = new sparkMd5.ArrayBuffer()
+      const appendToSpark = async (file: Blob) => {
+        return new Promise<void>((resolve) => {
+          const reader = new FileReader()
+          reader.readAsArrayBuffer(file)
+          reader.onload = (e: ProgressEvent<FileReader>) => {
+            spark.append(e.target?.result as ArrayBuffer)
+            resolve()
+          }
+        })
+      }
+
+      const work = async (deadline: { timeRemaining: () => number }) => {
+        while (index < chunkList.length && deadline.timeRemaining() > 1) {
+          console.log(`正在计算第${index}个,浏览器空闲剩余:${deadline.timeRemaining()}帧`)
+          await appendToSpark(chunkList[index])
+          index++
+          if (index == chunkList.length) {
+            console.log('计算完毕')
+            resolve(spark.end())
+            return
+          }
+        }
+        console.log(`浏览器不空闲了，计算到了第${index}个，等待下次浏览器空闲`)
+        window.requestIdleCallback(work)
+      }
+      window.requestIdleCallback(work)
+    })
+  }
+</script>
+```
